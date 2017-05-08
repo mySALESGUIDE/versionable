@@ -1,52 +1,41 @@
 <?php
 
-use Illuminate\Container\Container;
-use Illuminate\Database\Capsule\Manager as DB;
-use Illuminate\Events\Dispatcher;
-
-abstract class VersionableTestCase extends PHPUnit_Framework_TestCase
-{
-    public function setUp()
+    abstract class VersionableTestCase extends \Orchestra\Testbench\TestCase
     {
-        $this->configureDatabase();
-        $this->migrateUsersTable();
-    }
 
-    protected function configureDatabase()
-    {
-        $db = new DB;
-        $db->addConnection(array(
-            'driver'    => 'sqlite',
-            'database'  => ':memory:',
-            'charset'   => 'utf8',
-            'collation' => 'utf8_unicode_ci',
-            'prefix'    => '',
-        ));
-        $db->setEventDispatcher(new Dispatcher(new Container));
-        $db->bootEloquent();
-        $db->setAsGlobal();
-    }
+        /**
+         * Get package providers.
+         *
+         * @param  \Illuminate\Foundation\Application  $app
+         * @return array
+         */
+        protected function getPackageProviders($app)
+        {
+            return [
+                Mpociot\Couchbase\CouchbaseServiceProvider::class,
+            ];
+        }
 
-    public function migrateUsersTable()
-    {
-        DB::schema()->create('users', function ($table) {
-            $table->increments('id');
-            $table->string('name');
-            $table->string('email');
-            $table->string('password');
-            $table->datetime('last_login')->nullable();
-            $table->timestamps();
-            $table->softDeletes();
-        });
+        /**
+         * Define environment setup.
+         *
+         * @param  Illuminate\Foundation\Application    $app
+         * @return void
+         */
+        protected function getEnvironmentSetUp($app)
+        {
+            // reset base path to point to our package's src directory
+            //$app['path.base'] = __DIR__ . '/../src';
 
-        DB::schema()->create('versions', function ($table) {
-            $table->increments('version_id');
-            $table->integer('versionable_id');
-            $table->text('versionable_type');
-            $table->integer('user_id')->nullable();
-            $table->binary('model_data');
-            $table->string('reason', 100)->nullable();
-            $table->timestamps();
-        });
+            $config = require 'config/database.php';
+
+            $app['config']->set('app.key', 'ZsZewWyUJ5FsKp9lMwv4tYbNlegQilM7');
+
+            $app['config']->set('database.default', 'couchbase');
+            $app['config']->set('database.connections.mysql', $config['connections']['mysql']);
+            $app['config']->set('database.connections.couchbase', $config['connections']['couchbase']);
+
+            $app['config']->set('auth.providers.users.model', 'TestVersionableUser');
+            $app['config']->set('cache.driver', 'array');
+        }
     }
-}

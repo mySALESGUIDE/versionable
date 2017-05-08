@@ -117,7 +117,7 @@ trait VersionableTrait
      */
     public function getVersionModel($version_id)
     {
-        $version = $this->versions()->where("version_id", "=", $version_id)->first();
+        $version = $this->versions()->where($this->primaryKey, $version_id)->first();
         if (!is_null($version)) {
             return $version->getModel();
         }

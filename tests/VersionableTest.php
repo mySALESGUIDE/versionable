@@ -4,8 +4,10 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Config;
 use Mockery as m;
+    use Mpociot\Couchbase\Eloquent\Model;
+    use Mpociot\Versionable\Version;
 
-class VersionableTest extends VersionableTestCase
+    class VersionableTest extends VersionableTestCase
 {
 
     public function setUp()
@@ -139,13 +141,6 @@ class VersionableTest extends VersionableTestCase
 
     public function testGetResponsibleUserAttribute()
     {
-        Auth::shouldReceive('check')
-            ->andReturn( true );
-
-        Auth::shouldReceive('id')
-            ->andReturn( 1 );
-
-
         $responsibleOrigUser = new TestVersionableUser();
         $responsibleOrigUser->name = "Marcel";
         $responsibleOrigUser->email = "m.pociot@test.php";
@@ -153,13 +148,11 @@ class VersionableTest extends VersionableTestCase
         $responsibleOrigUser->last_login = $responsibleOrigUser->freshTimestamp();
         $responsibleOrigUser->save();
 
+
+        Auth::login($responsibleOrigUser);
+
         // Needed because otherwise timestamps are exactly the same
         sleep(1);
-
-        Config::shouldReceive('get')
-            ->once()
-            ->with("auth.model")
-            ->andReturn('TestVersionableUser');
 
         $user = new TestVersionableUser();
         $user->name = "John";
@@ -171,7 +164,7 @@ class VersionableTest extends VersionableTestCase
         $version = $user->currentVersion();
 
         $responsibleUser = $version->responsible_user;
-        $this->assertEquals( $responsibleUser->getKey(), 1 );
+        $this->assertEquals( $responsibleUser->getKey(), $responsibleOrigUser->getKey() );
         $this->assertEquals( $responsibleUser->name, $responsibleOrigUser->name );
         $this->assertEquals( $responsibleUser->email, $responsibleOrigUser->email );
     }
@@ -318,6 +311,9 @@ class VersionableTest extends VersionableTestCase
         $this->assertEquals( "Marcel", $newUser->name );
     }
 
+    /**
+     * @group testGetVersionModel
+     */
     public function testGetVersionModel()
     {
         Auth::shouldReceive('check')
@@ -331,17 +327,23 @@ class VersionableTest extends VersionableTestCase
         $user->last_login = $user->freshTimestamp();
         $user->save();
 
+        sleep(2);
+
         $user->name = "John";
         $user->save();
+
+        sleep(1);
 
         $user->name = "Michael";
         $user->save();
 
-        $this->assertCount( 3, $user->versions );
+        $versions = $user->versions()->orderBy(Version::CREATED_AT, 'ASC')->get();
 
-        $this->assertEquals( "Marcel", $user->getVersionModel( 1 )->name );
-        $this->assertEquals( "John", $user->getVersionModel( 2 )->name );
-        $this->assertEquals( "Michael", $user->getVersionModel( 3 )->name );
+        $this->assertCount( 3, $versions );
+
+        $this->assertEquals( "Marcel", $user->getVersionModel( $versions[0]->getKey() )->name );
+        $this->assertEquals( "John", $user->getVersionModel( $versions[1]->getKey() )->name );
+        $this->assertEquals( "Michael", $user->getVersionModel( $versions[2]->getKey() )->name );
         $this->assertEquals( null, $user->getVersionModel( 4 ) );
 
     }
@@ -478,13 +480,74 @@ class VersionableTest extends VersionableTestCase
 
 
 
-class TestVersionableUser extends Illuminate\Database\Eloquent\Model {
+class TestVersionableUser extends Model implements \Illuminate\Contracts\Auth\Authenticatable{
     use \Mpociot\Versionable\VersionableTrait;
 
     protected $table = "users";
+
+    /**
+     * Get the name of the unique identifier for the user.
+     *
+     * @return string
+     */
+    public function getAuthIdentifierName()
+    {
+        return "_id";
+    }
+
+    /**
+     * Get the unique identifier for the user.
+     *
+     * @return mixed
+     */
+    public function getAuthIdentifier()
+    {
+        return $this->getKey();
+    }
+
+    /**
+     * Get the password for the user.
+     *
+     * @return string
+     */
+    public function getAuthPassword()
+    {
+        // TODO: Implement getAuthPassword() method.
+    }
+
+    /**
+     * Get the token value for the "remember me" session.
+     *
+     * @return string
+     */
+    public function getRememberToken()
+    {
+        // TODO: Implement getRememberToken() method.
+    }
+
+    /**
+     * Set the token value for the "remember me" session.
+     *
+     * @param  string $value
+     * @return void
+     */
+    public function setRememberToken( $value )
+    {
+        // TODO: Implement setRememberToken() method.
+    }
+
+    /**
+     * Get the column name for the "remember me" token.
+     *
+     * @return string
+     */
+    public function getRememberTokenName()
+    {
+        // TODO: Implement getRememberTokenName() method.
+    }
 }
 
-class TestVersionableSoftDeleteUser extends Illuminate\Database\Eloquent\Model {
+class TestVersionableSoftDeleteUser extends Model {
     use \Mpociot\Versionable\VersionableTrait;
     use \Illuminate\Database\Eloquent\SoftDeletes;
 
@@ -492,7 +555,7 @@ class TestVersionableSoftDeleteUser extends Illuminate\Database\Eloquent\Model {
 }
 
 
-class TestPartialVersionableUser extends Illuminate\Database\Eloquent\Model {
+class TestPartialVersionableUser extends Model {
     use \Mpociot\Versionable\VersionableTrait;
 
     protected $table = "users";
