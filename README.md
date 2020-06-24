@@ -1,5 +1,5 @@
 # Versionable
-## Easy to use Model versioning for Laravel 6
+## Easy to use Model versioning for Laravel 7
 
 ![image](http://img.shields.io/packagist/v/mpociot/versionable.svg?style=flat)
 ![image](http://img.shields.io/packagist/l/mpociot/versionable.svg?style=flat)
@@ -36,7 +36,7 @@ $oldModel = Version::find(100)->getModel();
 
 In order to add Versionable to your project, just add 
 
-    "mpociot/versionable": "6-dev"
+    "mpociot/versionable": "7-dev"
 
 to your composer.json. Then run `composer install` or `composer update`.
 
